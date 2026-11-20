@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mini Data Center – Monitoreo y Simulación</title>
+  <link rel="stylesheet" href="estilo.css" />
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-  <link rel="stylesheet" href="estilo.css" />
 </head>
 <body>
   <div class="app-wrapper">
@@ -59,12 +59,12 @@
           <span class="card-label">Sensores DHT11</span>
           <div class="sensores-grid">
             <div class="sensor-box">
-              <span class="sensor-tag">Arriba (GPIO 4)</span>
+              <span class="sensor-tag">Arriba </span>
               <span class="sensor-val" id="t0Texto">--</span>
               <span class="sensor-sub" id="h0Texto">--</span>
             </div>
             <div class="sensor-box">
-              <span class="sensor-tag">Abajo (GPIO 19)</span>
+              <span class="sensor-tag">Abajo</span>
               <span class="sensor-val" id="t1Texto">--</span>
               <span class="sensor-sub" id="h1Texto">--</span>
             </div>
@@ -87,20 +87,20 @@
     </section>
 
     <section class="seccion-bloque">
-      <p class="seccion-titulo">Histórico de Temperatura Máxima</p>
+      <p class="seccion-titulo">Histórico de temperatura máxima (últimos 30 min)</p>
       <div class="card">
         <div class="chart-legend-bar">
           <div class="legend-items">
             <span class="legend-pill">
-              <span class="legend-dot" style="background: #0284c7;"></span>
+              <span class="legend-dot" style="background: #0ea5e9;"></span>
               <span>Temperatura Máx (°C)</span>
             </span>
             <span class="legend-pill">
-              <span class="legend-line" style="background: #ca8a04;"></span>
+              <span class="legend-line" style="border-color: #d97706;"></span>
               <span>Alerta (30 °C)</span>
             </span>
             <span class="legend-pill">
-              <span class="legend-line" style="background: #dc2626;"></span>
+              <span class="legend-line" style="border-color: #dc2626;"></span>
               <span>Crítico (35 °C)</span>
             </span>
           </div>
