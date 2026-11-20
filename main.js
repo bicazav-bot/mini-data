@@ -2,9 +2,9 @@ const WSS_URL = "wss://broker.emqx.io:8084/mqtt";
 const TOPIC_DATOS = "unemi/g3/minidatacenter/datos";
 const TOPIC_ESTADO = "unemi/g3/minidatacenter/estado";
 const TOPIC_CONFIG = "unemi/g3/minidatacenter/config";
-const STORAGE_KEY_HIST = "mdc_historial_temp_v1";
-const STORAGE_KEY_CSV = "mdc_registros_csv_v1";
-const MAX_PUNTOS = 60;
+const STORAGE_KEY_HIST = "mdc_historial_temp_v2";
+const STORAGE_KEY_CSV = "mdc_registros_csv_v2";
+const MAX_PUNTOS = 120;
 const MAX_REGISTROS_STORAGE = 2000;
 
 let espOnline = false;
@@ -209,33 +209,42 @@ function dibujarGrafica(hoverIdx = -1) {
   const { ctx, width, height } = prepararCanvas(canvas);
   ctx.clearRect(0, 0, width, height);
 
-  const padLeft = 46;
-  const padRight = 16;
-  const padTop = 16;
-  const padBottom = 26;
+  const padLeft = 44;
+  const padRight = 14;
+  const padTop = 18;
+  const padBottom = 24;
   const plotW = Math.max(40, width - padLeft - padRight);
   const plotH = Math.max(40, height - padTop - padBottom);
 
   const lo = 20;
-  const hi = 55;
+  const hi = 45;
   const yVal = (v) => padTop + plotH - ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * plotH;
 
   ctx.font = "600 10.5px Inter, system-ui, sans-serif";
   ctx.textBaseline = "middle";
 
-  [20, 30, 35, 45, 55].forEach((val) => {
+  [20, 25, 30, 35, 40, 45].forEach((val) => {
     const y = yVal(val);
     ctx.save();
-    ctx.strokeStyle = val === 30 ? "#eab308" : val === 35 ? "#ef4444" : "#e2e8f0";
-    if (val !== 20) ctx.setLineDash([4, 4]);
-    ctx.lineWidth = val === 30 || val === 35 ? 1.3 : 1;
+    if (val === 30) {
+      ctx.strokeStyle = "rgba(217, 119, 6, 0.72)";
+      ctx.setLineDash([5, 4]);
+      ctx.lineWidth = 1.35;
+    } else if (val === 35) {
+      ctx.strokeStyle = "rgba(220, 38, 38, 0.75)";
+      ctx.setLineDash([5, 4]);
+      ctx.lineWidth = 1.35;
+    } else {
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.22)";
+      ctx.lineWidth = 1;
+    }
     ctx.beginPath();
     ctx.moveTo(padLeft, y);
     ctx.lineTo(padLeft + plotW, y);
     ctx.stroke();
     ctx.restore();
 
-    ctx.fillStyle = "#64748b";
+    ctx.fillStyle = val === 35 ? "#b91c1c" : val === 30 ? "#a16207" : "#64748b";
     ctx.textAlign = "right";
     ctx.fillText(`${val}°`, padLeft - 8, y);
   });
@@ -245,34 +254,57 @@ function dibujarGrafica(hoverIdx = -1) {
     return;
   }
 
-  const denom = Math.max(1, MAX_PUNTOS - 1);
+  const denom = Math.max(1, historialTemp.length - 1);
   const coords = historialTemp.map((pt, i) => ({
-    x: padLeft + (i / denom) * plotW,
+    x: historialTemp.length === 1 ? padLeft + plotW : padLeft + (i / denom) * plotW,
     y: yVal(pt.tmax),
     tmax: pt.tmax,
     hora: pt.hora
   }));
 
   ctx.save();
-  ctx.strokeStyle = "#0284c7";
-  ctx.lineWidth = 2.4;
+  const gradFill = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
+  gradFill.addColorStop(0, "rgba(14, 165, 233, 0.22)");
+  gradFill.addColorStop(1, "rgba(14, 165, 233, 0.01)");
+
+  ctx.beginPath();
+  coords.forEach((c, i) => (i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y)));
+  ctx.lineTo(coords[coords.length - 1].x, padTop + plotH);
+  ctx.lineTo(coords[0].x, padTop + plotH);
+  ctx.closePath();
+  ctx.fillStyle = gradFill;
+  ctx.fill();
+
+  ctx.strokeStyle = "#0ea5e9";
+  ctx.lineWidth = 2.1;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
   ctx.beginPath();
   coords.forEach((c, i) => (i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y)));
   ctx.stroke();
   ctx.restore();
 
-  coords.forEach((c, i) => {
-    const active = i === hoverIdx;
+  if (hoverIdx >= 0 && hoverIdx < coords.length) {
+    const active = coords[hoverIdx];
+    ctx.save();
+    ctx.strokeStyle = "rgba(14, 165, 233, 0.45)";
+    ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.arc(c.x, c.y, active ? 5 : 3, 0, Math.PI * 2);
-    ctx.fillStyle = active ? "#0284c7" : "#ffffff";
+    ctx.moveTo(active.x, padTop);
+    ctx.lineTo(active.x, padTop + plotH);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(active.x, active.y, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#0ea5e9";
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "#0284c7";
+    ctx.strokeStyle = "#ffffff";
     ctx.stroke();
-  });
+  }
 
-  metaGrafica = { padLeft, plotW, denom, coords };
+  metaGrafica = { padLeft, plotW, coords };
 }
 
 function configurarTooltip() {
@@ -283,15 +315,15 @@ function configurarTooltip() {
     if (!metaGrafica || metaGrafica.coords.length === 0) return;
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
-    const { padLeft, plotW, denom, coords } = metaGrafica;
+    const { padLeft, plotW, coords } = metaGrafica;
     const rel = Math.max(0, Math.min(1, (mx - padLeft) / plotW));
-    const idx = Math.min(coords.length - 1, Math.round(rel * denom));
+    const idx = Math.min(coords.length - 1, Math.round(rel * Math.max(0, coords.length - 1)));
     const item = coords[idx];
 
     dibujarGrafica(idx);
     tooltip.style.display = "block";
     tooltip.innerHTML = `<div><strong>${item.hora}</strong></div><div>T máx: <strong>${fmtNum(item.tmax, 1, " °C")}</strong></div>`;
-    tooltip.style.left = `${Math.min(rect.width - 130, Math.max(10, mx + 12))}px`;
+    tooltip.style.left = `${Math.min(rect.width - 135, Math.max(10, mx + 12))}px`;
     tooltip.style.top = "12px";
   });
 
