@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Data Center – Monitoreo y Simulación</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+  <link rel="stylesheet" href="css/estilo.css" />
+</head>
+<body>
+  <div class="app-wrapper">
+    <header class="topbar">
+      <h1 class="titulo-app">Mini Data Center – Monitoreo</h1>
+      <div class="header-derecha">
+        <span class="badge-modo" id="modoBadge">Modo: --</span>
+        <span class="badge-tiempo" id="tiempoBadge">t = 0 min</span>
+        <button type="button" class="btn-qr-top" onclick="abrirModalQR()" title="Compartir acceso por código QR">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+            <path d="M14 14h3v3h-3z"></path>
+            <path d="M17 17h4v4h-4z"></path>
+            <path d="M21 14v.01"></path>
+            <path d="M14 21v.01"></path>
+          </svg>
+          <span>QR</span>
+        </button>
+        <div class="indicador-esp" id="indicadorEsp" title="Estado de conexión ESP32">
+          <span class="punto-estado"></span>
+        </div>
+      </div>
+    </header>
+
+    <section class="seccion-bloque">
+      <p class="seccion-titulo">Estado Térmico del Rack</p>
+      <div class="grid-resumen">
+        <div class="card">
+          <span class="card-label">Estado actual</span>
+          <div class="estado-pill estado-normal" id="estadoTexto">NORMAL</div>
+          <div class="meta-lista">
+            <div class="meta-item">
+              <span>Ventilador</span>
+              <strong id="fanTexto">APAGADO</strong>
+            </div>
+            <div class="meta-item">
+              <span>Temperatura máxima</span>
+              <strong id="tmaxTexto">--</strong>
+            </div>
+            <div class="meta-item">
+              <span>Tiempo hasta 35 °C (sin enfriar)</span>
+              <strong id="predTexto">--</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <span class="card-label">Sensores DHT11</span>
+          <div class="sensores-grid">
+            <div class="sensor-box">
+              <span class="sensor-tag">Arriba (GPIO 4)</span>
+              <span class="sensor-val" id="t0Texto">--</span>
+              <span class="sensor-sub" id="h0Texto">--</span>
+            </div>
+            <div class="sensor-box">
+              <span class="sensor-tag">Abajo (GPIO 19)</span>
+              <span class="sensor-val" id="t1Texto">--</span>
+              <span class="sensor-sub" id="h1Texto">--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-top-row">
+            <span class="card-label">Registro de eventos</span>
+            <div class="botones-grupo">
+              <button type="button" class="btn-sm" id="btnLimpiar" onclick="limpiarAlmacenamiento()">Limpiar</button>
+              <button type="button" class="btn-sm" onclick="abrirModalExportar()">Descargar CSV</button>
+            </div>
+          </div>
+          <ul class="eventos-lista" id="listaEventos">
+            <li class="evento-vacio">Sin cambios de estado registrados</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="seccion-bloque">
+      <p class="seccion-titulo">Histórico de Temperatura Máxima</p>
+      <div class="card">
+        <div class="chart-legend-bar">
+          <div class="legend-items">
+            <span class="legend-pill">
+              <span class="legend-dot" style="background: #0284c7;"></span>
+              <span>Temperatura Máx (°C)</span>
+            </span>
+            <span class="legend-pill">
+              <span class="legend-line" style="background: #ca8a04;"></span>
+              <span>Alerta (30 °C)</span>
+            </span>
+            <span class="legend-pill">
+              <span class="legend-line" style="background: #dc2626;"></span>
+              <span>Crítico (35 °C)</span>
+            </span>
+          </div>
+          <span class="chart-hint" id="contadorGuardados">0 registros guardados</span>
+        </div>
+        <div class="canvas-container">
+          <canvas id="graficaTemp" class="pro-chart"></canvas>
+          <div id="tooltipTemp" class="chart-tooltip"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="seccion-bloque" id="seccionControles">
+      <p class="seccion-titulo">Escenarios y Control Remoto</p>
+      <div class="card">
+        <div class="controles-grid">
+          <div class="campo">
+            <label for="selModo">Modo de operación</label>
+            <select id="selModo">
+              <option value="real">Real (sensores DHT11)</option>
+              <option value="sim">Simulación (modelo térmico)</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="selCarga">Carga térmica [W]</label>
+            <select id="selCarga">
+              <option value="0">0 W</option>
+              <option value="3">3 W</option>
+              <option value="6.5" selected>6.5 W</option>
+              <option value="9">9 W</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="inpTamb">Temperatura ambiente [°C]</label>
+            <input id="inpTamb" type="number" step="0.5" min="10" max="40" value="25" />
+          </div>
+
+          <div class="campo">
+            <label for="inpTon">Encendido ventilador [°C]</label>
+            <input id="inpTon" type="number" step="0.5" min="26" max="34" value="29" />
+          </div>
+        </div>
+
+        <div class="acciones-footer">
+          <label class="check-label">
+            <input id="chkFalla" type="checkbox" />
+            <span>Simular falla del ventilador</span>
+          </label>
+
+          <div class="botones-grupo">
+            <button type="button" class="btn-secundario" id="btnReiniciar" onclick="enviarConfig(true)">Reiniciar histórico</button>
+            <button type="button" class="btn-primario" id="btnAplicar" onclick="enviarConfig(false)">Aplicar escenario</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="modalQR">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 class="modal-titulo">Acceso mediante código QR</h2>
+      </div>
+
+      <div class="rol-tabs">
+        <button type="button" class="rol-tab activo" id="tabEspectador" onclick="seleccionarTabRol('espectador')">Espectador</button>
+        <button type="button" class="rol-tab" id="tabAdmin" onclick="seleccionarTabRol('admin')">Administrador</button>
+      </div>
+
+      <div class="qr-panel">
+        <canvas id="qrCanvas"></canvas>
+        <p class="qr-desc" id="qrDescripcion"></p>
+        <div class="qr-url-row">
+          <input type="text" class="qr-url-input" id="qrUrlInput" readonly />
+          <button type="button" class="btn-sm" id="btnCopiarEnlace" onclick="copiarEnlaceRol()">Copiar</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-primario" onclick="cerrarModalQR()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modalExportar">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 class="modal-titulo">Exportar datos CSV</h2>
+      </div>
+
+      <div class="modal-seccion">
+        <span class="modal-subtitulo">Selecciona los datos a incluir</span>
+        <div class="opciones-grid">
+          <label class="opcion-check">
+            <input type="checkbox" class="col-csv" value="fecha_hora" checked />
+            <span>Fecha y hora</span>
+          </label>
+          <label class="opcion-check">
+            <input type="checkbox" class="col-csv" value="t_s" checked />
+            <span>Tiempo (t_s)</span>
+          </label>
+          <label class="opcion-check">
+            <input type="checkbox" class="col-csv" value="T_C" checked />
+            <span>Temperatura (°C)</span>
+          </label>
+          <label class="opcion-check">
+            <input type="checkbox" class="col-csv" value="estado" checked />
+            <span>Estado</span>
+          </label>
+          <label class="opcion-check">
+            <input type="checkbox" class="col-csv" value="ventilador" checked />
+            <span>Ventilador</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-seccion">
+        <label class="modal-subtitulo" for="selRangoCsv">Rango de tiempo</label>
+        <div class="campo">
+          <select id="selRangoCsv">
+            <option value="10">Últimos 10 minutos</option>
+            <option value="20">Últimos 20 minutos</option>
+            <option value="all" selected>Todos los registros</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secundario" onclick="cerrarModalExportar()">Cancelar</button>
+        <button type="button" class="btn-primario" onclick="confirmarExportarCSV()">Descargar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
